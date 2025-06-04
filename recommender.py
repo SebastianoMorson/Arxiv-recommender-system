@@ -305,9 +305,89 @@ def get_codes_from_raw_topics(raw_topics):
         topics.append(description_to_code(area))
     return topics
 
+
+
+from sklearn.metrics.pairwise import cosine_similarity
+def recommendation_weighted(user_feedback):
+    global embeddings_dataset, dataset_ids
+    """
+    user_feedback = [
+    # Esempio:
+    # {'id': '2505.10224', 'embedding': np.array([...]), 'like': 1, 'clicks': 3},
+    # {'id': '2505.10225', 'embedding': np.array([...]), 'like': -1, 'clicks': 1},
+    # ...
+    """
+
+    # Costruisci array di embeddings e pesi
+    embeddings_list = []
+    weights = []
+    for item in user_feedback:
+        # Peso: like/dislike ha molto peso, i click aumentano il peso
+        # Esempio: like=1 -> +10, dislike=-1 -> -10, neutro=0 -> 0
+        # Peso finale: (like * 10) + clicks
+        like_weight = 10 * item['like']  # like=1 -> +10, dislike=-1 -> -10
+        click_weight = item['clicks']
+        total_weight = like_weight + click_weight
+        embeddings_list.append(item['embedding'])
+        weights.append(total_weight)
+
+    embeddings_arr = np.vstack(embeddings_list)
+    weights_arr = np.array(weights)
+
+    # Normalizza i pesi (opzionale, solo se vuoi che la somma sia 1)
+    if np.sum(np.abs(weights_arr)) > 0:
+        weights_arr = weights_arr / np.sum(np.abs(weights_arr))
+
+    # Calcola l'embedding pesato del gruppo
+    group_embedding_weighted = np.average(embeddings_arr, axis=0, weights=weights_arr).reshape(1, -1)
+
+    # Calcola la similarità tra l'embedding pesato e tutti gli embeddings del dataset
+    # embeddings_dataset = ... (array numpy di tutti gli embeddings degli articoli)
+    similarities = cosine_similarity(group_embedding_weighted, embeddings_dataset)[0]
+
+    # Prendi i top-N articoli più simili (escludendo quelli già visti)
+    N = 20
+    seen_ids = set([item['id'] for item in user_feedback])
+    top_indices = [i for i in np.argsort(similarities)[::-1] if dataset_ids[i] not in seen_ids][:N]
+
+    # Visualizza i risultati
+    for rank, idx in enumerate(top_indices, 1):
+        print(f"Recommendation {rank}: {dataset_ids[idx]} (similarity: {similarities[idx]:.3f})")
+
+    return top_indices, similarities[top_indices]
+
+
+def actions_parsed(user_actions):
+    global df, df_emb
+    embedding_cols = [col for col in df_emb.columns if col not in ['id', 'categories', 'title']]
+    data = []
+    for action in user_actions:
+        actions = user_actions[action]
+        dic = {}
+        dic["id"] = action
+        dic["clicks"] = actions["clicks"]
+        dic["like"] = actions["likes"]
+        dic["time_spent"] = actions["time_spent"]
+        dic["embedding"] = df_emb[df_emb["id"] == action][embedding_cols].values[0] if not df_emb[df_emb["id"] == action].empty else None
+        data.append(dic)
+    return data
+
 import os, json
 import time 
 if __name__ == "__main__":
+    global df, embeddings_dataset, dataset_ids
+
+    try:
+        # Load the dataset and embeddings
+        df = load_data('arxiv_dataset.csv', 'arxiv_specter_embeddings.csv')
+        embeddings_dataset = df.drop(columns=['id', 'categories', 'title']).values
+        dataset_ids = df['id'].values
+        print("Dataset and embeddings loaded successfully.")
+    except Exception as e:
+        print(f"Error loading dataset or embeddings: {e}")
+        exit(1)
+
+
     # check if there exist user_registration_info.json
     while not os.path.exists('user_registration_info.json'):
         pass
@@ -331,8 +411,19 @@ if __name__ == "__main__":
         
             # estraggo gli items valutati
             rated_items = [item['id'] for item in user_actions if item['action'] == 'rated']
-        
+            
+            # ristrutturo user_actions in un formato utilizzabile
+            user_actions_dict = actions_parsed(user_actions)
+            # calcolo le raccomandazioni
+            recommendation_weighted(user_actions_dict)        
+
+            # scrivo le raccomandazioni in un file
+            with open('user_rec.json', 'w') as f:
+                json.dump(recommendation_weighted(user_actions_dict), f, indent=4)
+
         time.sleep(5000)
+
+
 
         # scrivo delle raccomandazioni basate sulle informazioni contenute dentro user_actions.json
         # aspetto che il file user_actions.json venga modificato
