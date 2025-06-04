@@ -1,23 +1,20 @@
-{
-  "username": "mariorossi",
-  "first_name": "Mario",
-  "last_name": "Rossi",
-  "age": 28,
-  "gender": "male",
-  "registration_date": "2025-06-04T14:30:00Z",
-  "preferences": {
-    "macro-areas": [
-      "cs",
-      "math",
-      "physics",
-      "astro-ph",
-      "cond-mat"
-    ],
-    "sub-areas": [
-      "cs.LG",         
-      "math.CO",       
-      "physics.optics",
-      "astro-ph.GA"    
-    ]
-  }
-}
+[
+    {
+        "name": "ABDULAI TAMBA",
+        "surname": "LEBBIE",
+        "username": "atdon",
+        "status": "professor",
+        "company": "UDINE",
+        "age": 23,
+        "topics": [
+            "Computer Science",
+            "Quantitative Biology",
+            "Statistics"
+        ],
+        "subtopics": [
+            "Artificial Intelligence",
+            "Genomics",
+            "Cryptography and Security"
+        ]
+    }
+]
