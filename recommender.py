@@ -306,6 +306,7 @@ def get_codes_from_raw_topics(raw_topics):
     return topics
 
 import os, json
+import time 
 if __name__ == "__main__":
     # check if there exist user_registration_info.json
     while not os.path.exists('user_registration_info.json'):
@@ -318,8 +319,20 @@ if __name__ == "__main__":
         # write the user interests to a file
         with open('registration_samples.json', 'w') as f:
             json.dump(registration_samples.to_dict(orient='records'), f, indent=4)
+        
     while not os.path.exists('user_actions.json'):
         pass
+
     while True:
+
+        # leggi il file user_actions.json
+        with open('user_actions.json', 'r') as f:
+            user_actions = json.load(f)
+        
+            # estraggo gli items valutati
+            rated_items = [item['id'] for item in user_actions if item['action'] == 'rated']
+        
+        time.sleep(5000)
+
         # scrivo delle raccomandazioni basate sulle informazioni contenute dentro user_actions.json
         # aspetto che il file user_actions.json venga modificato
