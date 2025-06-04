@@ -1,0 +1,11 @@
+# ==============================================================================
+# AI-based tools for metrics in Education, STEM, and Social Sciences
+# Author: Madalin Mamuleanu
+# Contact: madalin.mamuleanu@edu.ucv.ro
+# Web: https://www.across-alliance.eu/
+# ==============================================================================
+pandas
+numpy
+transformers
+tqdm
+pyarrow  # for parquet support
