@@ -230,7 +230,7 @@ def load_data(ds_file_path, embeddings_file_path):
     df_emb = pd.read_csv(embeddings_file_path)
     df_emb = df_emb.merge(df_dataset[['id', 'categories']], on='id', how='left')
     print('Dataset loaded successfully.')
-    return df_emb
+    return df_emb, df_dataset
 
 #df = load_data('/Users/enricotazzer/Desktop/hackathon/data/arxiv_dataset.csv', '/Users/enricotazzer/Desktop/hackathon/data/arxiv_specter_embeddings.csv') # Replace with actual file paths
 
@@ -246,6 +246,8 @@ def random_not_user_interests(df, user_interests, n=20):
     return df_not_interests.sample(n=min(n, len(df_not_interests)), random_state=42)
 
 def extract_samples(user_interests, n_samples=2):
+    if not user_interests or not isinstance(user_interests, (list, tuple)):
+        raise ValueError("user_interests deve essere una lista di categorie.")
     samples = []
     for cat in user_interests:
         cat_samples = df[df['categories'].str.contains(cat, na=False)].sample(n=min(n_samples, len(df)), random_state=42)
@@ -282,32 +284,25 @@ def code_to_description(code):
             if code == sub_code:
                 return desc
             
-def description_to_code(description):
-    # Macro category
-    for code, desc in macro_categories.items():
-        if desc == description:
-            return code
-    # Subcategory
-    for macro, subs in sub_categories.items():
-        for sub_code, desc in subs:
+def description_to_code(descriptions):
+    codes = []
+    for description in descriptions:
+        # Macro category
+        for code, desc in macro_categories.items():
             if desc == description:
-                return sub_code
+                codes.append(code)
+        # Subcategory
+        for macro, subs in sub_categories.items():
+            for sub_code, desc in subs:
+                if desc == description:
+                    codes.append(sub_code)
 
-def get_codes_from_raw_topics(raw_topics):
-    with open("user_registration_info.json", "r") as f:
-        json_data = json.load(f)
-    macro_area = json_data[0]["topics"]
-    sub_area = json_data[0]["subtopics"]
-    topics = []
-    for area in macro_area:
-        topics.append(description_to_code(area))
-    for area in sub_area:
-        topics.append(description_to_code(area))
-    return topics
+    return codes
 
 
 
 from sklearn.metrics.pairwise import cosine_similarity
+
 def recommendation_weighted(user_feedback):
     global embeddings_dataset, dataset_ids
     """
@@ -322,17 +317,33 @@ def recommendation_weighted(user_feedback):
     embeddings_list = []
     weights = []
     for item in user_feedback:
-        # Peso: like/dislike ha molto peso, i click aumentano il peso
-        # Esempio: like=1 -> +10, dislike=-1 -> -10, neutro=0 -> 0
-        # Peso finale: (like * 10) + clicks
-        like_weight = 10 * item['like']  # like=1 -> +10, dislike=-1 -> -10
-        click_weight = item['clicks']
-        total_weight = like_weight + click_weight
-        embeddings_list.append(item['embedding'])
-        weights.append(total_weight)
+        emb = item['embedding']
+        # Fix: flatten embedding if it has shape (1, N)
+        if emb is not None and len(emb.shape) == 2 and emb.shape[0] == 1:
+            emb = emb.flatten()
+        # Check che l'embedding sia un array 1D della giusta dimensione
+        if emb is not None and len(emb.shape) == 1 and emb.shape[0] == embeddings_dataset.shape[1]:
+            embeddings_list.append(emb)
+            # Peso: like/dislike ha molto peso, i click aumentano il peso
+            like_weight = 10 * item['like']  # like=1 -> +10, dislike=-1 -> -10
+            click_weight = item['clicks']
+            total_weight = like_weight + click_weight
+            weights.append(total_weight)
+        else:
+            # Salta embedding non validi
+            continue
+
+    if not embeddings_list or not weights:
+        print("Nessun embedding valido trovato in user_feedback.")
+        return [], []
 
     embeddings_arr = np.vstack(embeddings_list)
     weights_arr = np.array(weights)
+
+    # Assicura che weights_arr abbia la stessa lunghezza di embeddings_arr lungo axis=0
+    if embeddings_arr.shape[0] != weights_arr.shape[0]:
+        print("Mismatch tra numero di embeddings e pesi, controllo dati.")
+        return [], []
 
     # Normalizza i pesi (opzionale, solo se vuoi che la somma sia 1)
     if np.sum(np.abs(weights_arr)) > 0:
@@ -342,7 +353,6 @@ def recommendation_weighted(user_feedback):
     group_embedding_weighted = np.average(embeddings_arr, axis=0, weights=weights_arr).reshape(1, -1)
 
     # Calcola la similarità tra l'embedding pesato e tutti gli embeddings del dataset
-    # embeddings_dataset = ... (array numpy di tutti gli embeddings degli articoli)
     similarities = cosine_similarity(group_embedding_weighted, embeddings_dataset)[0]
 
     # Prendi i top-N articoli più simili (escludendo quelli già visti)
@@ -355,7 +365,6 @@ def recommendation_weighted(user_feedback):
         print(f"Recommendation {rank}: {dataset_ids[idx]} (similarity: {similarities[idx]:.3f})")
 
     return top_indices, similarities[top_indices]
-
 
 def actions_parsed(user_actions):
     global df, df_emb
@@ -375,27 +384,26 @@ def actions_parsed(user_actions):
 import os, json
 import time 
 if __name__ == "__main__":
-    global df, embeddings_dataset, dataset_ids
-
+    global df, df_emb, dataset_ids
     try:
         # Load the dataset and embeddings
-        df = load_data('arxiv_dataset.csv', 'arxiv_specter_embeddings.csv')
-        embeddings_dataset = df.drop(columns=['id', 'categories', 'title']).values
+        df_emb, df = load_data('/Users/enricotazzer/Desktop/hackathon/data/arxiv_dataset.csv', '/Users/enricotazzer/Desktop/hackathon/data/arxiv_specter_embeddings.csv')
+        embeddings_dataset = df.drop(columns=['id', 'categories']).values
         dataset_ids = df['id'].values
         print("Dataset and embeddings loaded successfully.")
     except Exception as e:
         print(f"Error loading dataset or embeddings: {e}")
         exit(1)
 
-
     # check if there exist user_registration_info.json
     while not os.path.exists('user_registration_info.json'):
         pass
     with open('user_registration_info.json', 'r') as f:
         user_registration_info = json.load(f)
-        raw_topics = user_registration_info['topics']
-        topics_codes = get_codes_from_raw_topics(raw_topics)
+        raw_topics = user_registration_info[0]['topics']
+        topics_codes = description_to_code(raw_topics)
         registration_samples = extract_samples(topics_codes, n_samples=2)
+        
         # write the user interests to a file
         with open('registration_samples.json', 'w') as f:
             json.dump(registration_samples.to_dict(orient='records'), f, indent=4)
@@ -410,7 +418,7 @@ if __name__ == "__main__":
             user_actions = json.load(f)
         
             # estraggo gli items valutati
-            rated_items = [item['id'] for item in user_actions if item['action'] == 'rated']
+            #rated_items = [item['id'] for item in user_actions if item['action'] == 'rated']
             
             # ristrutturo user_actions in un formato utilizzabile
             user_actions_dict = actions_parsed(user_actions)
