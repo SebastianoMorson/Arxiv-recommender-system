@@ -457,6 +457,14 @@ def raw2codes(raw_topics=None, raw_subtopics=None):
 
 from sklearn.metrics.pairwise import cosine_similarity
 
+
+"""
+naive recommender: restituisce i documenti più simili all'embedding medio degli articoli che l'utente ha valutato
+senza aggiornamento rispetto al dominio di interesse dell'utente.
+la versione futura dovrebbe prevedere 
+- l'aggiornamento sulla base delle nuove categorie piaciute
+- una nuova metodologia di esploration-exploitation
+"""
 def recommendation_weighted(user_feedback):
     global df_ids_cats, df_emb, df
     """
@@ -640,8 +648,6 @@ def recommendation_loop():
             json.dump(recommendations.to_dict(orient='records'), f, indent=4)
 
         time.sleep(30) # Attendo 30 secondi prima di ripetere il ciclo
-
-
 
 
 

@@ -34,27 +34,27 @@ def craft_uactions_from_samples():
 
 def craft_uactions_from_userrec():
     # Carica i dati dal file userrec.json
-    with open('userrec.json', 'r') as f:
+    with open('user_rec.json', 'r') as f:
         userrec = json.load(f)
 
     user_actions = {}
     now = datetime.now().isoformat()
 
-    for user_id, recs in userrec.items():
-        for rec in recs:
-            paper_id = rec.get("id")
-            if not paper_id:
-                continue  # salta se manca l'id
+    for entry in userrec:
+        # Prendi l'id se presente
+        paper_id = entry.get("id")
+        if not paper_id:
+            continue  # salta se manca l'id
 
-            # Valutazione artificiale: clicks sempre "1", likes random tra -1, 0, 1
-            user_actions[paper_id] = {
-                "clicks": ["1"],
-                "likes": [str(random.choice([-1, 0, 1]))],
-                "favorites": ["1"],
-                "time_spent": [],
-                "searches": [],
-                "last_active": now
-            }
+        # Valutazione artificiale: clicks sempre "1", likes random tra -1, 0, 1
+        user_actions[paper_id] = {
+            "clicks": [str(random.choice(range(0,6)))],
+            "likes": [str(random.choice([-1, 0, 1]))],
+            "favorites": ["1"],
+            "time_spent": [],
+            "searches": [],
+            "last_active": now
+        }
 
     # Salva il risultato su user_actions.json
     with open('user_actions.json', 'w') as f:
