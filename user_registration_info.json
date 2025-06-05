@@ -7,13 +7,10 @@
         "company": "UDINE",
         "age": 23,
         "topics": [
-            "Computer Science",
-            "Quantitative Biology",
-            "Statistics"
+            "Computer Science"  
         ],
         "subtopics": [
             "Artificial Intelligence",
-            "Genomics",
             "Cryptography and Security"
         ]
     }
